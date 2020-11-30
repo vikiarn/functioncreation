@@ -1,0 +1,177 @@
+---
+title: "Building an R package from scratch"
+author: Simon Munzert
+date: "November 25, 2020"
+---
+
+
+# Building an R package from scratch
+
+This short tutorial borrows from these great resources:
+
+- Hilary Parker: Writing an R package from scratch (https://hilaryparker.com/2014/04/29/writing-an-r-package-from-scratch/)
+- Hadley Wickham and Jenny Bryan: R packages, Chapter 2 "The whole game" (https://r-pkgs.org/whole-game.html) 
+- Karl Broman: R package primer (https://kbroman.org/pkg_primer/)
+
+It runs through the development of a small toy package. It's meant to paint the Big Picture and suggest a workflow, before we descend into the detailed treatment of the key components of an R package. To keep the pace brisk, we exploit the modern conveniences in the devtools package and the RStudio IDE. 
+
+Note: In this minimal example, we won't sync the package to GitHub as not to overload information and won't do version control via Git. In principle, it is strongly recommended to use Git for version control during the process.
+
+
+## Step 1: Load the packages you will need
+
+Load the devtools package, which is the public face of a set of packages that support various aspects of package development. Also load the roxygen2 package, which provides helper functions to document your package.
+
+```{r}
+library(devtools)
+library(roxygen2)
+#install.packages("https://github.com/stan-dev/rstantools/archive/mlysy-rstantools_patch.tar.gz", repos = NULL)
+library(rstantools)
+```
+
+
+## Step 2: Create your package directory
+
+You are going to create a directory with the bare minimum folders of R packages. We are going to make a very tiny package provding only a single function as an illustration.
+
+Call `create_package()` from the `usethis` package, which is loaded when you load `devtools`, to initialize a new package in a directory on your computer (and create the directory, if necessary). Make a deliberate choice about where to create this package on your computer. It should probably be somewhere within your home directory, alongside your other R projects. It should not be nested inside another RStudio Project, R package, or Git repo. Nor should it be in an R package library, which holds packages that have already been built and installed. The conversion of the source package we are creating here into an installed package is part of what devtools facilitates. Don't try to do devtools' job for it! 
+
+Substitute your chosen path into a `create_package()` call like this:
+
+```{r, eval = FALSE}
+create_package("./firstfunction", open = FALSE)
+```
+
+Also, let's navigate into that directory, which will allow us to use some fancy functions down the line.
+
+```{r, eval = FALSE}
+setwd("./firstfunction")
+```
+
+
+
+## Step 3: Add your functions
+
+Now it's time to add the functions you want to create the package for. Let's just work with a toy function here:
+
+It is not too hard to find a puzzling operation involving factors. Let's see what happens when we catenate two factors.
+
+```{r}
+#Function to return % of GDP from a data source
+x <- c(0.333, 0.6666, 0.9999, 1.000, 1.33333)
+
+addPercentGDP <- function(x){
+ percent <- round(x * 100, digits = 1)
+ result <- paste(percent, "% of GDP", sep = "")
+ return(result)
+}
+
+addPercentGDP(x)
+
+```
+
+Huh? Many people do not expect the result of catenating two factors to be an integer vector consisting of the numbers 1, 2, 3, and 4. What if we coerce each factor to character, catenate, then re-convert to factor?
+
+```{r}
+#factor(c(as.character(a), as.character(b)))
+```
+
+That seems to produce a result that makes more sense. Let's drop that logic into the body of a function called `fbind()`:
+
+```{r}
+#  fbind <- function(a, b) {
+#   factor(c(as.character(a), as.character(b)))
+#  }
+```
+
+Save this function as an R file, `fbind.R`, to the R directory in your package folder.
+
+Alternatively, you can use the helper function `use_r()`from the `usethis` package, which automatically creates and/or opens a script below `R/`: 
+
+```{r, eval = FALSE}
+use_r("addPercentGDP")
+```
+
+
+
+## Step 4: Add documention
+
+While not strictly necessary, it's useful for Future-You and anybody else if you provide some documentation of your function. Luckily, there's a tool again that helps you doing that. All you have to do is to add a comment like the following at the beginning of your function file, just like:
+
+```{txt}
+#' Bind two factors
+#'
+#' Create a new character from an existing integer (raw data on GDP), where the new character will have a description 
+#' of "% of GDP" automatically added and will be rounded.
+#'
+#' @param a factor
+#'
+#' @return character
+#' @export
+#' @examples
+#' fbind(worlddata$GDP[c(1.333, 0.543, 0.543)], usatotal$gdp[c(0.777, 1.345, 0.21)])
+```
+
+Then, you can run `document()` from roxygen2 to automatically create the documentation for you:
+
+```{r document-fbind, eval = FALSE}
+document()
+```
+
+You should now be able to preview your help file like so:
+
+```{r eval = FALSE}
+?addPercentGDP
+```
+
+
+## Step 5: Install!
+
+Now it is as simple as installing the package! You need to run this from the parent working directory that contains the package folder.
+
+```{r eval = FALSE}
+setwd("..")
+install("addPercentGDP")
+```
+
+Now you have a real, live, functioning R package. For example, try typing ?fbind. You should see the standard help page pop up!
+
+
+## Step 6: Check your package
+
+```{r eval = FALSE}
+setwd("addPercentGDP")
+check()
+```
+
+
+## Step 7: Add a licence
+
+The field of (software) licensing is complex. Check out https://choosealicense.com/ for a start.
+In terms of open source licenses, there are two major types:
+	- permissive licences: easy-going; can be freely copied, modified, and published. examples: MIT, Apache
+	- copyleft licenses: can be freely copied and modified or personal use, but publishing may be restricted. example: GPL
+
+The usethis package comes with helper functions to add various licenses with minimal effort.
+
+Things can become more complicated when you use other people's code and want to bundle it with yours. The licenses may not be compatible. See https://en.wikipedia.org/wiki/License_compatibility. 
+
+See https://r-pkgs.org/license.html for more information.
+
+```{r eval = FALSE}
+use_mit_license("Viktoria Arnold")
+# use_gpl_license("Simon Munzert")
+# use_proprietary_license("Simon Munzert") # don't make it open sources; cannot be published on CRAN
+```
+
+## Additional steps
+
+- Iterative loading and testing -> load_all()
+- Adding unit tests -> use_testthat()
+- Import functions from other packages -> use_package()
+- Version control and collaboration -> use_github()
+- Add a proper public description -> use_readme_rmd()
+- Add vignettes -> use_vignette()
+- Submit to CRAN -> devtools::build(), devtools::release()
+
+
